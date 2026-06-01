@@ -1,7 +1,9 @@
-# Final Analysis: Code Files and Plots
+# Analysis of replicates for Ellesmere Fyles Leaf Bed aeDNA data 
+
+Supplementary Section 4.6.9 Replication analysis and changes over the depth profile
 
 All scripts run from the `ellesmere/` project root.
-Sample metadata always loaded from `data/FMC_processed/replicate_sample_assignments_newNames.csv`.
+Sample metadata loaded from `data/FMC_processed/replicate_sample_assignments_newNames.csv`.
 Eukaryote and microbe analyses are separate throughout. 
 Analyses use both ss and ds libraries as replicates.
 
@@ -12,7 +14,7 @@ Analyses use both ss and ds libraries as replicates.
 ### `prep_data.r`
 **What it does:** Reads the two raw TSV files and the sample metadata CSV, then produces
 the four processed long-format CSVs used by all downstream analysis scripts. Each output
-row is one taxon × one library, with columns: library_id, genus, core_replicate,
+row is one taxon x one library, with columns: library_id, genus, core_replicate,
 tech_replicate, n_reads, profile_location.
 
 **Inputs:**
@@ -53,11 +55,8 @@ Normalization: proportionsCPM.
 
 ### `plot_composition_errorbars.r`
 **What it does:** Makes stacked bar composition plots (% reads by taxon) across profile
-heights, with ss and ds libraries pooled. Reads are summed across both library types within
-each (profile_location, core_replicate), so each core replicate contributes one combined
-profile. Proportions are computed per pooled replicate, then mean and 95% CI of the mean
-are taken across core replicates at each profile height. Error bars shown for the 10 most
-abundant taxa.
+heights, with ss and ds libraries pooled. Proportions are computed per library, then mean and 95% CI of the mean
+are taken across replicates at each profile height. Error bars shown for the 10 most abundant taxa.
 
 **Runs for:** Euk and Mic.
 
@@ -89,7 +88,7 @@ the permutation tests.
 
 ### `plot_aitchison_distances.r`
 **What it does:** Reads pre-computed data from `run_aitchison_distances.r` and renders
-the grouped bar plot of mean Aitchison distance ± SE with significance brackets.
+the grouped bar plot of mean Aitchison distance +- SE with significance brackets.
 Faceted by ss+ds combined / ss only / ds only. Can be re-run to adjust aesthetics
 without repeating the permutation tests.
 
@@ -136,7 +135,7 @@ computed between three pair types:
 - `ds-ds`: dsA vs dsB — core-rep variation within ds
 - `matched-cross`: ssX vs dsX — library-type distance for the same core-rep
 
-Only locations with ≥ 2 core_replicate labels present in both ss and ds are included.
+Only locations with >= 2 core_replicate labels present in both ss and ds are included.
 Statistical test: `lmer(distance ~ pair_type + (1|profile_location))`, likelihood ratio ANOVA.
 Pairwise contrasts computed from REML model. If matched-cross ≈ ss-ss and ds-ds,
 ss and ds are not systematically more different from each other than core replicates
@@ -154,18 +153,15 @@ within the same type.
 ## Plots
 
 ### `final_plots/composition_errorbars_euk.pdf`
-Stacked bar chart showing eukaryote community composition (% reads) across profile heights,
-with ss and ds libraries pooled. Each bar is a profile height; each color is a taxon
-(plant/macroalgal genus). Error bars (95% CI of the mean) shown for the 10 most
-abundant taxa. Illustrates how community composition changes along the sediment profile and
-how consistent that composition is across core replicates.
+Stacked bar chart showing eukaryote community composition (% reads) across profile heights. Each bar is a profile height; each color is a taxon
+(plant genus). Error bars (95% CI of the mean) shown for the 10 most
+abundant taxa. Illustrates how community composition changes along the sediment profile and how consistent that composition is across core replicates.
 
 ### `final_plots/composition_errorbars_mic.pdf`
-Same as above but for microbial families. Shows profile-height-structured turnover in
-microbial community composition, with replication precision indicated by error bar width.
+Same as above but for microbial families. 
 
 ### `final_plots/aitchison_distances.pdf`
-Grouped bar plot of mean Aitchison distance ± SE between tech-rep, core-rep, and non-rep
+Grouped bar plot of mean Aitchison distance +- SE between tech-rep, core-rep, and non-rep
 pairs, for Euk and Mic separately, faceted by ss+ds combined / ss only / ds only.
 Significance brackets from 9999-permutation tests. Demonstrates that replicates (especially
 tech-reps) are substantially more similar to each other than to samples from different
