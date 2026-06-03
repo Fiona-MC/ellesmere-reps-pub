@@ -12,9 +12,9 @@
 #   ellesmere_mic_long_ss.csv
 #   ellesmere_mic_long_ds.csv
 #
-# Column format: library_id, genus, core_replicate, tech_replicate, n_reads
+# Column format: library_id, genus, core_replicate, tech_replicate, n_reads, profile_location
 #   tech_replicate   = paste(core_replicate, tech_replicate_from_RSA, sep = "_")
-#   profile_location is always read from the RSA at analysis time; not duplicated here.
+#   profile_location is joined from the RSA at prep time and carried in the output CSV.
 #
 # Run from the ellesmere/ project root.
 
@@ -25,7 +25,35 @@ library(tidyr)
 
 rsa <- read.csv("data/FMC_processed/replicate_sample_assignments_newNames.csv",
                 check.names = FALSE)
-rsa <- rsa[, c("library_id", "library_type", "core_replicate", "tech_replicate")]
+rsa <- rsa[, c("library_id", "library_type", "profile_location", "core_replicate", "tech_replicate")]
+
+# ── Sanity checks on RSA ──────────────────────────────────────────────────────
+
+dup_ids <- unique(rsa$library_id[duplicated(rsa$library_id)])
+if (length(dup_ids) > 0)
+    cat("WARNING: duplicate library_ids in RSA (keeping first):", paste(dup_ids, collapse = ", "), "\n")
+
+for (col in c("library_id", "library_type", "profile_location", "core_replicate", "tech_replicate")) {
+    n_na <- sum(is.na(rsa[[col]]))
+    if (n_na > 0) cat("WARNING: RSA has", n_na, "NA(s) in column '", col, "'\n")
+}
+
+# library_id should start with FLB{profile_location}{core_replicate}_
+expected_prefix <- paste0("FLB", rsa$profile_location, rsa$core_replicate, "_")
+bad_prefix <- !startsWith(rsa$library_id, expected_prefix)
+if (any(bad_prefix)) {
+    cat("WARNING:", sum(bad_prefix), "library_id(s) don't start with FLB{location}{core_rep}_:\n")
+    print(rsa[bad_prefix, c("library_id", "profile_location", "core_replicate")])
+}
+
+# library_type should appear immediately after the first underscore in library_id
+after_underscore <- sub("^[^_]+_", "", rsa$library_id)
+bad_lt <- !startsWith(after_underscore, rsa$library_type)
+if (any(bad_lt)) {
+    cat("WARNING:", sum(bad_lt), "library_id(s) don't encode library_type after '_':\n")
+    print(rsa[bad_lt, c("library_id", "library_type")])
+}
+
 rsa <- rsa[!duplicated(rsa$library_id), ]
 rsa$tech_rep_out <- paste(rsa$core_replicate, rsa$tech_replicate, sep = "_")
 
@@ -49,6 +77,10 @@ process_tsv <- function(tsv_path, suffix, out_prefix) {
     # Keep only libraries in RSA
     keep <- lib_ids %in% rsa$library_id
     if (!any(keep)) stop("No library_ids from TSV match RSA for suffix '", suffix, "'")
+    not_in_rsa <- lib_ids[!keep]
+    if (length(not_in_rsa) > 0)
+        cat("  NOTE:", length(not_in_rsa), "TSV library_id(s) not in RSA (dropped):",
+            paste(not_in_rsa, collapse = ", "), "\n")
     raw <- raw[, c("TaxName", reads_cols[keep]), drop = FALSE]
     lib_ids <- lib_ids[keep]
 
@@ -64,10 +96,16 @@ process_tsv <- function(tsv_path, suffix, out_prefix) {
     long <- left_join(long, rsa, by = "library_id")
     long <- long[!is.na(long$library_type), ]
 
+    # Check for unexpected NAs in profile_location after join
+    na_loc <- unique(long$library_id[is.na(long$profile_location)])
+    if (length(na_loc) > 0)
+        cat("  WARNING: NA profile_location after join for library_id(s):",
+            paste(na_loc, collapse = ", "), "\n")
+
     # Build output columns
     long$tech_replicate <- long$tech_rep_out
 
-    out_cols <- c("library_id", "genus", "core_replicate", "tech_replicate", "n_reads")
+    out_cols <- c("library_id", "genus", "core_replicate", "tech_replicate", "n_reads", "profile_location")
 
     # Split by library_type and write
     for (lt in c("ss", "ds")) {

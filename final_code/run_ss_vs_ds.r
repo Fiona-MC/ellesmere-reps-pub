@@ -28,7 +28,7 @@ library(dplyr)
 
 rsa <- read.csv("data/FMC_processed/replicate_sample_assignments_newNames.csv",
                 check.names = FALSE)
-rsa <- rsa[, c("library_id", "library_type", "profile_location", "core_replicate")]
+rsa <- rsa[, c("library_id", "library_type")]
 rsa <- rsa[!duplicated(rsa$library_id), ]
 
 data_configs <- list(
@@ -51,7 +51,7 @@ for (cfg in data_configs) {
         read.csv(file.path("data/FMC_processed", paste0(cfg$stem, "_ds.csv")), na.strings = "")
     )
     counts <- counts[!is.na(counts$genus), ]
-    counts <- counts[, setdiff(names(counts), c("core_replicate", "tech_replicate", "library_type"))]
+    counts <- counts[, setdiff(names(counts), c("tech_replicate", "library_type"))]
     counts <- merge(counts, rsa, by = "library_id", all.x = TRUE)
     counts <- counts[!is.na(counts$profile_location) & !is.na(counts$core_replicate), ]
     counts <- counts[counts$profile_location != "54m", ]

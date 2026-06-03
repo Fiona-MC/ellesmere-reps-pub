@@ -32,7 +32,7 @@ data_configs <- list(
 
 rsa <- read.csv("data/FMC_processed/replicate_sample_assignments_newNames.csv",
                 check.names = FALSE)
-rsa <- rsa[, c("library_id", "library_type", "profile_location", "core_replicate")]
+rsa <- rsa[, c("library_id", "library_type")]
 rsa <- rsa[!duplicated(rsa$library_id), ]
 
 # ── Core variance partitioning function ──────────────────────────────────────
@@ -126,7 +126,7 @@ for (cfg in data_configs) {
     data <- rbind(read.csv(ss_path, na.strings = ""),
                   read.csv(ds_path, na.strings = ""))
     data <- data[!is.na(data$genus), ]
-    data <- data[, setdiff(names(data), c("core_replicate", "tech_replicate", "library_type"))]
+    data <- data[, setdiff(names(data), c("tech_replicate", "library_type"))]
     data <- merge(data, rsa, by = "library_id", all.x = TRUE)
     data <- data[!is.na(data$profile_location), ]
     data <- data[data$profile_location != "54m", ]

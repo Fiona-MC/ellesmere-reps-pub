@@ -8,7 +8,7 @@
 #   Tech rep  : same profile_location + same library_type + same core_replicate + diff library_id
 #   Core rep  : same profile_location + same library_type + diff core_replicate
 #   Non-rep   : diff profile_location
-#   (cross-type pairs within same profile_location are excluded)
+#   Cross-type: same profile_location + diff library_type → included by default (exclude_cross_type = FALSE)
 #
 # Aitchison distance = Euclidean on CLR-transformed proportions (+0.5 pseudocount).
 #
@@ -20,7 +20,7 @@ library(dplyr)
 
 rsa <- read.csv("data/FMC_processed/replicate_sample_assignments_newNames.csv",
                 check.names = FALSE)
-rsa <- rsa[, c("library_id", "library_type", "profile_location", "core_replicate")]
+rsa <- rsa[, c("library_id", "library_type")]
 rsa <- rsa[!duplicated(rsa$library_id), ]
 
 data_configs <- list(
@@ -36,7 +36,7 @@ sig_stars <- function(p) {
     return("ns")
 }
 
-classify_pairs <- function(d_mat, lib_meta, lt_filter = NULL) {
+classify_pairs <- function(d_mat, lib_meta, lt_filter = NULL, exclude_cross_type = FALSE) {
     if (!is.null(lt_filter)) {
         lib_meta <- lib_meta[lib_meta$library_type == lt_filter, ]
         lib_meta <- lib_meta[lib_meta$library_id %in% rownames(d_mat), ]
@@ -48,7 +48,8 @@ classify_pairs <- function(d_mat, lib_meta, lt_filter = NULL) {
     k    <- 0L
     for (i in seq_len(n - 1)) {
         for (j in seq(i + 1, n)) {
-            li <- libs[i]; lj <- libs[j]
+            li <- libs[i]
+            lj <- libs[j]
             if (!li %in% rownames(d_mat) || !lj %in% rownames(d_mat)) next
             mi <- lib_meta[lib_meta$library_id == li, ]
             mj <- lib_meta[lib_meta$library_id == lj, ]
@@ -57,10 +58,8 @@ classify_pairs <- function(d_mat, lib_meta, lt_filter = NULL) {
             same_br   <- mi$core_replicate == mj$core_replicate
             pair_type <- if (!same_hole) {
                 "Non-rep"
-            } else if (same_lt && same_br) {
-                "Tech rep"
-            } else if (same_lt && !same_br) {
-                "Core rep"
+            } else if (same_lt || !exclude_cross_type) {
+                if (same_br) "Tech rep" else "Core rep"
             } else {
                 NA_character_
             }
@@ -83,7 +82,7 @@ for (cfg in data_configs) {
         read.csv(file.path("data/FMC_processed", paste0(cfg$stem, "_ds.csv")), na.strings = "")
     )
     counts <- counts[!is.na(counts$genus), ]
-    counts <- counts[, setdiff(names(counts), c("core_replicate", "tech_replicate", "library_type"))]
+    counts <- counts[, setdiff(names(counts), c("tech_replicate", "library_type"))]
     counts <- merge(counts, rsa, by = "library_id", all.x = TRUE)
     counts <- counts[!is.na(counts$profile_location), ]
     counts <- counts[counts$profile_location != "54m", ]
@@ -102,8 +101,9 @@ for (cfg in data_configs) {
     clr_mat <- log(prop_ps) - rowMeans(log(prop_ps))
     d_mat   <- as.matrix(dist(clr_mat, method = "euclidean"))
 
-    lib_meta <- rsa[rsa$library_id %in% rownames(d_mat), ]
-    lib_meta <- lib_meta[!duplicated(lib_meta$library_id), ]
+    lib_meta <- counts[!duplicated(counts$library_id),
+                       c("library_id", "library_type", "profile_location", "core_replicate")]
+    lib_meta <- lib_meta[lib_meta$library_id %in% rownames(d_mat), ]
 
     for (subset in c("combined", "ss", "ds")) {
         lt_filter <- if (subset == "combined") NULL else subset
@@ -159,7 +159,6 @@ for (ds_label in c("Eukaryote", "Microbe")) {
             obs_diff <- abs(mean(vals_a) - mean(vals_b))
             pooled   <- c(vals_a, vals_b)
             n_a      <- length(vals_a)
-            set.seed(42)
             perm_diffs <- replicate(9999, {
                 s <- sample(pooled)
                 abs(mean(s[seq_len(n_a)]) - mean(s[seq(n_a + 1, length(s))]))
